@@ -200,7 +200,7 @@ class FocalLoss(nn.Module):
     def forward(self, input, target):
         target = target.view(-1)
 
-        logpt = F.log_softmax(input)
+        logpt = F.log_softmax(input, dim=-1)
         logpt = logpt.index_select(-1, target).diag()
         logpt = logpt.view(-1)
         pt = logpt.exp()

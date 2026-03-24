@@ -5,11 +5,13 @@
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 
-#include <THC/THC.h>
-#include <THC/THCAtomics.cuh>
-#include <THC/THCDeviceUtils.cuh>
+#include <ATen/cuda/Atomic.cuh>
 
 #include <cfloat>
+
+// Replacement for CeilDiv
+template <typename T>
+inline T CeilDiv(T a, T b) { return (a + b - 1) / b; }
 
 // TODO make it in a common file
 #define CUDA_1D_KERNEL_LOOP(i, n)                            \
@@ -107,9 +109,9 @@ at::Tensor SigmoidFocalLoss_forward_cuda(
 		const int num_classes, 
 		const float gamma, 
 		const float alpha) {
-  AT_ASSERTM(logits.type().is_cuda(), "logits must be a CUDA tensor");
-  AT_ASSERTM(targets.type().is_cuda(), "targets must be a CUDA tensor");
-  AT_ASSERTM(logits.dim() == 2, "logits should be NxClass");
+  TORCH_CHECK(logits.is_cuda(), "logits must be a CUDA tensor");
+  TORCH_CHECK(targets.is_cuda(), "targets must be a CUDA tensor");
+  TORCH_CHECK(logits.dim() == 2, "logits should be NxClass");
 
   const int num_samples = logits.size(0);
 	
@@ -117,27 +119,27 @@ at::Tensor SigmoidFocalLoss_forward_cuda(
   auto losses_size = num_samples * logits.size(1);
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
 
-  dim3 grid(std::min(THCCeilDiv((long)losses_size, 512L), 4096L));
+  dim3 grid(std::min(CeilDiv((long)losses_size, 512L), 4096L));
   
   dim3 block(512);
 
   if (losses.numel() == 0) {
-    THCudaCheck(cudaGetLastError());
+    C10_CUDA_CHECK(cudaGetLastError());
     return losses;
   }
 
-  AT_DISPATCH_FLOATING_TYPES(logits.type(), "SigmoidFocalLoss_forward", [&] {
+  AT_DISPATCH_FLOATING_TYPES(logits.scalar_type(), "SigmoidFocalLoss_forward", [&] {
     SigmoidFocalLossForward<scalar_t><<<grid, block, 0, stream>>>(
          losses_size,
-         logits.contiguous().data<scalar_t>(),
-	 targets.contiguous().data<int>(),
+         logits.contiguous().data_ptr<scalar_t>(),
+	 targets.contiguous().data_ptr<int>(),
          num_classes,
 	 gamma,
 	 alpha,
 	 num_samples,
-         losses.data<scalar_t>());
+         losses.data_ptr<scalar_t>());
   });
-  THCudaCheck(cudaGetLastError());
+  C10_CUDA_CHECK(cudaGetLastError());
   return losses;   
 }	
 
@@ -149,41 +151,41 @@ at::Tensor SigmoidFocalLoss_backward_cuda(
 		const int num_classes, 
 		const float gamma, 
 		const float alpha) {
-  AT_ASSERTM(logits.type().is_cuda(), "logits must be a CUDA tensor");
-  AT_ASSERTM(targets.type().is_cuda(), "targets must be a CUDA tensor");
-  AT_ASSERTM(d_losses.type().is_cuda(), "d_losses must be a CUDA tensor");
+  TORCH_CHECK(logits.is_cuda(), "logits must be a CUDA tensor");
+  TORCH_CHECK(targets.is_cuda(), "targets must be a CUDA tensor");
+  TORCH_CHECK(d_losses.is_cuda(), "d_losses must be a CUDA tensor");
 
-  AT_ASSERTM(logits.dim() == 2, "logits should be NxClass");
+  TORCH_CHECK(logits.dim() == 2, "logits should be NxClass");
 
   const int num_samples = logits.size(0);
-  AT_ASSERTM(logits.size(1) == num_classes, "logits.size(1) should be num_classes");
+  TORCH_CHECK(logits.size(1) == num_classes, "logits.size(1) should be num_classes");
 	
   auto d_logits = at::zeros({num_samples, num_classes}, logits.options());
   auto d_logits_size = num_samples * logits.size(1);
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
 
-  dim3 grid(std::min(THCCeilDiv((long)d_logits_size, 512L), 4096L));
+  dim3 grid(std::min(CeilDiv((long)d_logits_size, 512L), 4096L));
   dim3 block(512);
 
   if (d_logits.numel() == 0) {
-    THCudaCheck(cudaGetLastError());
+    C10_CUDA_CHECK(cudaGetLastError());
     return d_logits;
   }
 
-  AT_DISPATCH_FLOATING_TYPES(logits.type(), "SigmoidFocalLoss_backward", [&] {
+  AT_DISPATCH_FLOATING_TYPES(logits.scalar_type(), "SigmoidFocalLoss_backward", [&] {
     SigmoidFocalLossBackward<scalar_t><<<grid, block, 0, stream>>>(
          d_logits_size,
-         logits.contiguous().data<scalar_t>(),
-	 targets.contiguous().data<int>(),
-	 d_losses.contiguous().data<scalar_t>(),
+         logits.contiguous().data_ptr<scalar_t>(),
+	 targets.contiguous().data_ptr<int>(),
+	 d_losses.contiguous().data_ptr<scalar_t>(),
          num_classes,
 	 gamma,
 	 alpha,
 	 num_samples,
-         d_logits.data<scalar_t>());
+         d_logits.data_ptr<scalar_t>());
   });
 
-  THCudaCheck(cudaGetLastError());
+  C10_CUDA_CHECK(cudaGetLastError());
   return d_logits;   
 }	
 

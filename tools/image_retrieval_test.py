@@ -23,7 +23,7 @@ import numpy as np
 try:
     from apex import amp
 except ImportError:
-    raise ImportError('Use APEX for multi-precision via apex.amp')
+    pass
 
 # Do Not set it above 5000, otherwise you will start to run tests on the validation data...
 GALLERY_SIZE = 150
@@ -43,7 +43,8 @@ def execute_test(cfg, local_rank, distributed, logger, gallery_size):
     # Initialize mixed-precision training
     use_mixed_precision = cfg.DTYPE == "float16"
     amp_opt_level = 'O1' if use_mixed_precision else 'O0'
-    model, optimizer = amp.initialize(model, optimizer, opt_level=amp_opt_level)
+    # amp.initialize removed (no apex)
+    # model, optimizer = amp.initialize(model, optimizer, opt_level=amp_opt_level)
 
     if distributed:
         model = torch.nn.parallel.DistributedDataParallel(

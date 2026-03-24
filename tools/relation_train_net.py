@@ -33,12 +33,7 @@ from maskrcnn_benchmark.utils.metric_logger import MetricLogger
 import numpy as np
 import random
 
-# See if we can use apex.DistributedDataParallel instead of the torch default,
-# and enable mixed-precision via apex.amp
-try:
-    from apex import amp
-except ImportError:
-    raise ImportError('Use APEX for multi-precision via apex.amp')
+# apex removed - not needed for training
 
 
 def setup_seed(seed):
@@ -87,10 +82,6 @@ def train(cfg, local_rank, distributed, logger):
     optimizer = make_optimizer(cfg, model, logger, slow_heads=slow_heads, slow_ratio=10.0, rl_factor=float(num_batch))
     scheduler = make_lr_scheduler(cfg, optimizer, logger)
     debug_print(logger, 'end optimizer and shcedule')
-    # Initialize mixed-precision training
-    use_mixed_precision = cfg.DTYPE == "float16"
-    amp_opt_level = 'O1' if use_mixed_precision else 'O0'
-    model, optimizer = amp.initialize(model, optimizer, opt_level=amp_opt_level)
 
     if distributed:
         model = torch.nn.parallel.DistributedDataParallel(
@@ -168,10 +159,7 @@ def train(cfg, local_rank, distributed, logger):
             meters.update(loss=losses_reduced, **loss_dict_reduced)
 
             optimizer.zero_grad()
-            # Note: If mixed precision is not used, this ends up doing nothing
-            # Otherwise apply loss scaling for mixed-precision recipe
-            with amp.scale_loss(losses, optimizer) as scaled_losses:
-                scaled_losses.backward()
+            losses.backward()
             
             # add clip_grad_norm from MOTIFS, tracking gradient, used for debug
             verbose = (iteration % cfg.SOLVER.PRINT_GRAD_FREQ) == 0 or print_first_grad # print grad or not
