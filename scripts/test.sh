@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-export PYTHONPATH=/mnt/hdd1/zhanghaonan/code/code_sgg/lib/apex:/mnt/hdd1/zhanghaonan/code/code_sgg/lib/cocoapi:/mnt/hdd1/zhanghaonan/code/code_sgg/Scene-Graph-Benchmark.pytorch-master:$PYTHONPATH
 
 export CUDA_VISIBLE_DEVICES=3
 export NUM_GUP=1
 echo "Testing!!!!"
 MODEL_NAME="PE-NET_PredCls"
-python \
+python3 \
         tools/relation_test_net.py \
         --config-file "configs/e2e_relation_X_101_32_8_FPN_1x.yaml" \
         MODEL.ROI_RELATION_HEAD.USE_GT_BOX True \
