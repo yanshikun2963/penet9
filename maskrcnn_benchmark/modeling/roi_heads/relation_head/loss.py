@@ -215,6 +215,16 @@ class FocalLoss(nn.Module):
 
 def make_roi_relation_loss_evaluator(cfg):
 
+    # CB-Loss beta: configurable via environment variable CB_BETA
+    # Set CB_BETA=none for vanilla (no reweighting), CB_BETA=0.9999 for default
+    import os
+    cb_beta_str = os.environ.get("CB_BETA", "0.9999")
+    if cb_beta_str.lower() == "none":
+        cb_beta_val = None
+        print("[CB-Loss] DISABLED (vanilla CrossEntropyLoss)")
+    else:
+        cb_beta_val = float(cb_beta_str)
+
     loss_evaluator = RelationLossComputation(
         cfg.MODEL.ATTRIBUTE_ON,
         cfg.MODEL.ROI_ATTRIBUTE_HEAD.NUM_ATTRIBUTES,
@@ -223,7 +233,7 @@ def make_roi_relation_loss_evaluator(cfg):
         cfg.MODEL.ROI_ATTRIBUTE_HEAD.ATTRIBUTE_BGFG_RATIO,
         cfg.MODEL.ROI_RELATION_HEAD.LABEL_SMOOTHING_LOSS,
         cfg.MODEL.ROI_RELATION_HEAD.REL_PROP,
-        cb_loss_beta=0.9999,
+        cb_loss_beta=cb_beta_val,
     )
 
     return loss_evaluator
