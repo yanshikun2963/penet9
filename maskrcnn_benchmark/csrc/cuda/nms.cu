@@ -8,7 +8,7 @@
 int const threadsPerBlock = sizeof(unsigned long long) * 8;
 
 // Replacement for THCCeilDiv
-inline int CeilDiv(int a, int b) {
+__device__ __host__ inline int CeilDiv(int a, int b) {
   return (a + b - 1) / b;
 }
 
